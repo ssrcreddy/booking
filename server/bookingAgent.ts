@@ -8,8 +8,8 @@ import {
   HOURS,
   MAX_BOOKINGS_PER_USER_PER_DAY,
   OPEN_HOUR,
-} from '../src/config';
-import { addDays, formatHour } from '../src/dateUtils';
+} from '../src/config.js';
+import { addDays, formatHour } from '../src/dateUtils.js';
 
 /**
  * Chat booking assistant. Runs server-side because it holds the Anthropic API
