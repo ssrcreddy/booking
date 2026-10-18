@@ -24,4 +24,13 @@ export const MAX_BOOKINGS_PER_USER_PER_DAY = 2;
  */
 export const BOOKING_ASSISTANT_ENABLED = true;
 
+export type AssistantProvider = 'claude' | 'openai' | 'gemini';
+
+/**
+ * Which AI runs the booking assistant. Needs the matching server-side key:
+ * ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY (see .env.example).
+ * Restart or redeploy to apply; open conversations are asked to reload.
+ */
+export const BOOKING_ASSISTANT_PROVIDER: AssistantProvider = 'claude';
+
 export const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);

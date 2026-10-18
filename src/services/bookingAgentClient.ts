@@ -4,12 +4,12 @@ import { BookingError } from './bookingService';
 export interface AgentTurn {
   reply: string;
   /** Conversation so far, owned by the server; send it back unchanged. */
-  history: unknown[];
+  history: unknown;
   booked: boolean;
 }
 
 /** One turn with the booking assistant (server/bookingAgent.ts). It acts as the signed-in user. */
-export async function askBookingAgent(history: unknown[], message: string): Promise<AgentTurn> {
+export async function askBookingAgent(history: unknown, message: string): Promise<AgentTurn> {
   const { data } = await neon.auth.getSession();
   const token = data?.session?.token;
   if (!token) throw new BookingError('Please sign in again.');
