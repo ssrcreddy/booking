@@ -2,14 +2,11 @@
 /// <reference types="node" />
 import { defineConfig, loadEnv, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { createBookingAgentHandler } from './server/bookingAgent';
+import { bookingAgentHandlerFromEnv } from './server/bookingAgent';
 
 /** Serves the booking assistant at /api/booking-agent in `vite` and `vite preview`. */
 function bookingAgentApi(env: Record<string, string>): Plugin {
-  const handle = createBookingAgentHandler({
-    anthropicApiKey: env.ANTHROPIC_API_KEY ?? '',
-    dataApiUrl: env.VITE_NEON_DATA_API_URL ?? '',
-  });
+  const handle = bookingAgentHandlerFromEnv(env);
 
   const middleware: Connect.NextHandleFunction = async (req, res) => {
     try {
