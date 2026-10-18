@@ -1,13 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { AgentProvider } from '../agentProvider.js';
+import {
+  EMPTY_REPLY,
+  isMessageArray,
+  MAX_STEPS,
+  REFUSAL_REPLY,
+  TOO_MANY_STEPS_REPLY,
+  type AgentProvider,
+} from '../agentProvider.js';
 import { clubTimeNote, HttpError, SYSTEM_PROMPT, TOOL_DEFINITIONS } from '../bookingTools.js';
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type ToolResult = Anthropic.Beta.Messages.BetaToolResultBlockParam;
 
 const MODEL = 'claude-opus-5-5';
-const MAX_STEPS = 8;
-const MAX_HISTORY_MESSAGES = 120;
 
 const TOOLS: Anthropic.Beta.Messages.BetaTool[] = TOOL_DEFINITIONS.map((t) => ({
   name: t.name,
@@ -16,26 +21,15 @@ const TOOLS: Anthropic.Beta.Messages.BetaTool[] = TOOL_DEFINITIONS.map((t) => ({
   input_schema: t.parameters,
 }));
 
-function isHistory(value: unknown): value is MessageParam[] {
-  return (
-    Array.isArray(value) &&
-    value.length <= MAX_HISTORY_MESSAGES &&
-    value.every(
-      (m) =>
-        typeof m === 'object' &&
-        m !== null &&
-        ((m as MessageParam).role === 'user' || (m as MessageParam).role === 'assistant'),
-    )
-  );
-}
-
 /** Claude via the Anthropic API: a manual tool-use loop, so the full transcript can go back to the browser. */
-export function createClaudeProvider(apiKey: string): AgentProvider<MessageParam[]> {
-  const client = new Anthropic({ apiKey });
-
+export function createClaudeProvider(client: Anthropic): AgentProvider<MessageParam[]> {
   return {
+    name: 'claude',
+
     parseHistory(value) {
-      return isHistory(value) ? value : null;
+      return isMessageArray(value, (m) => m.role === 'user' || m.role === 'assistant')
+        ? (value as MessageParam[])
+        : null;
     },
 
     async runTurn({ now, tools }, history, message) {
@@ -63,10 +57,8 @@ export function createClaudeProvider(apiKey: string): AgentProvider<MessageParam
             messages,
           });
 
-          if (response.stop_reason === 'refusal') {
-            // Drop the refused turn so the conversation can carry on.
-            return { reply: "Sorry, I can't help with that. I can check availability and book courts.", history };
-          }
+          // Drop a refused turn so the conversation can carry on.
+          if (response.stop_reason === 'refusal') return { reply: REFUSAL_REPLY, history };
 
           messages.push({ role: 'assistant', content: response.content });
 
@@ -75,7 +67,7 @@ export function createClaudeProvider(apiKey: string): AgentProvider<MessageParam
               .flatMap((b) => (b.type === 'text' ? [b.text] : []))
               .join('\n')
               .trim();
-            return { reply: reply || 'Sorry, something went wrong. Please try again.', history: messages };
+            return { reply: reply || EMPTY_REPLY, history: messages };
           }
 
           const results: ToolResult[] = [];
@@ -102,7 +94,7 @@ export function createClaudeProvider(apiKey: string): AgentProvider<MessageParam
         throw err;
       }
 
-      return { reply: 'Sorry, that took too many steps. Please try again with a date and time.', history: messages };
+      return { reply: TOO_MANY_STEPS_REPLY, history: messages };
     },
   };
 }

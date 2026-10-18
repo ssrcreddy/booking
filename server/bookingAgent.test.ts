@@ -14,6 +14,7 @@ const TOMORROW = addDays(clubNow().date, 1);
 function scriptedProvider(calls: { name: string; input: unknown }[]) {
   const outcomes: ToolOutcome[] = [];
   const provider: AgentProvider<string[]> = {
+    name: 'claude',
     parseHistory: (value) => (Array.isArray(value) ? (value as string[]) : null),
     async runTurn({ tools }, history, message) {
       for (const call of calls) outcomes.push(await tools.run(call.name, call.input));
@@ -57,11 +58,15 @@ describe('booking agent endpoint', () => {
     ]);
 
     const res = await createBookingAgentHandler({ dataApiUrl: DATA_API, provider })(
-      request({ history: [], message: 'tomorrow 6pm' }),
+      request({ history: null, message: 'tomorrow 6pm' }),
     );
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ reply: 'done', history: ['tomorrow 6pm'], booked: true });
+    expect(await res.json()).toEqual({
+      reply: 'done',
+      history: { provider: 'claude', data: ['tomorrow 6pm'] },
+      booked: true,
+    });
 
     const availability = JSON.parse(outcomes[0].content);
     expect(availability.free_slots.find((s: { hour: number }) => s.hour === 9).free_courts).toEqual(['c2', 'c3', 'c4']);
@@ -83,7 +88,7 @@ describe('booking agent endpoint', () => {
     ]);
 
     const res = await createBookingAgentHandler({ dataApiUrl: DATA_API, provider })(
-      request({ history: [], message: 'tomorrow 6pm' }),
+      request({ history: null, message: 'tomorrow 6pm' }),
     );
 
     expect(outcomes).toEqual([{ content: 'You can book at most 2 slots per day.', isError: true }]);
@@ -95,7 +100,7 @@ describe('booking agent endpoint', () => {
     const tooFar = addDays(clubNow().date, 14);
     const { provider, outcomes } = scriptedProvider([{ name: 'get_availability', input: { date: tooFar } }]);
 
-    await createBookingAgentHandler({ dataApiUrl: DATA_API, provider })(request({ history: [], message: 'x' }));
+    await createBookingAgentHandler({ dataApiUrl: DATA_API, provider })(request({ history: null, message: 'x' }));
 
     expect(outcomes[0].isError).toBe(true);
     expect(outcomes[0].content).toContain('14 days');
@@ -104,13 +109,13 @@ describe('booking agent endpoint', () => {
 
   it('refuses requests without a valid login before running the model', async () => {
     const runTurn = vi.fn();
-    const provider: AgentProvider = { parseHistory: (v) => v, runTurn };
+    const provider: AgentProvider = { name: 'claude', parseHistory: (v) => v, runTurn };
     const handle = createBookingAgentHandler({ dataApiUrl: DATA_API, provider });
 
-    expect((await handle(request({ history: [], message: 'hi' }, null))).status).toBe(401);
+    expect((await handle(request({ history: null, message: 'hi' }, null))).status).toBe(401);
 
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));
-    expect((await handle(request({ history: [], message: 'hi' }))).status).toBe(401);
+    expect((await handle(request({ history: null, message: 'hi' }))).status).toBe(401);
     expect(runTurn).not.toHaveBeenCalled();
   });
 
@@ -119,15 +124,27 @@ describe('booking agent endpoint', () => {
     const { provider } = scriptedProvider([]);
 
     const res = await createBookingAgentHandler({ dataApiUrl: DATA_API, provider })(
-      request({ history: 'not a transcript', message: 'hi' }),
+      request({ history: { provider: 'claude', data: 'not a transcript' }, message: 'hi' }),
     );
 
     expect(res.status).toBe(400);
   });
 
+  it('continues a conversation and asks for a reload after a provider switch', async () => {
+    mockDataApi();
+    const { provider } = scriptedProvider([]);
+    const handle = createBookingAgentHandler({ dataApiUrl: DATA_API, provider });
+
+    const next = await handle(request({ history: { provider: 'claude', data: ['earlier'] }, message: 'hi' }));
+    expect((await next.json()).history).toEqual({ provider: 'claude', data: ['earlier', 'hi'] });
+
+    const switched = await handle(request({ history: { provider: 'openai', data: [] }, message: 'hi' }));
+    expect(switched.status).toBe(409);
+  });
+
   it('reports a missing provider as not configured', async () => {
     const res = await createBookingAgentHandler({ dataApiUrl: DATA_API, provider: null })(
-      request({ history: [], message: 'hi' }),
+      request({ history: null, message: 'hi' }),
     );
     expect(res.status).toBe(500);
   });

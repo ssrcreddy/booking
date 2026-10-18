@@ -1,7 +1,12 @@
-import { BOOKING_ASSISTANT_ENABLED } from '../src/config.js';
+import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
+import { BOOKING_ASSISTANT_ENABLED, BOOKING_ASSISTANT_PROVIDER, type AssistantProvider } from '../src/config.js';
 import type { AgentProvider } from './agentProvider.js';
 import { clubNow, createDataApi, createToolRunner, HttpError, ToolError } from './bookingTools.js';
 import { createClaudeProvider } from './providers/claude.js';
+import { createGeminiProvider } from './providers/gemini.js';
+import { createOpenAIProvider } from './providers/openai.js';
 
 /**
  * HTTP endpoint for the chat booking assistant. Runs server-side because it
@@ -15,10 +20,16 @@ export interface BookingAgentConfig {
   provider: AgentProvider | null;
 }
 
+/** What the browser holds between turns: the transcript, tagged with the provider that wrote it. */
+interface StoredHistory {
+  provider: AssistantProvider;
+  data: unknown;
+}
+
 export interface AgentReply {
   reply: string;
-  /** Full transcript to send back next turn (opaque to the browser). */
-  history: unknown;
+  /** Send back unchanged next turn (opaque to the browser). */
+  history: StoredHistory;
   booked: boolean;
 }
 
@@ -56,10 +67,16 @@ export function createBookingAgentHandler(config: BookingAgentConfig) {
       return json(400, { error: 'Invalid request.' });
     }
     const message = typeof body.message === 'string' ? body.message.trim() : '';
-    const history = provider.parseHistory(body.history ?? []);
-    if (!message || message.length > MAX_MESSAGE_CHARS || history === null) {
-      return json(400, { error: 'Invalid request.' });
+    if (!message || message.length > MAX_MESSAGE_CHARS) return json(400, { error: 'Invalid request.' });
+
+    // null starts a new conversation. A transcript from another provider (the
+    // admin switched BOOKING_ASSISTANT_PROVIDER) can't be continued.
+    const stored = body.history as Partial<StoredHistory> | null | undefined;
+    if (stored != null && stored.provider !== provider.name) {
+      return json(409, { error: 'The assistant was updated. Reload the page to start a new conversation.' });
     }
+    const history = provider.parseHistory(stored == null ? [] : stored.data);
+    if (history === null) return json(400, { error: 'Invalid request.' });
 
     const api = createDataApi(config.dataApiUrl, token);
     try {
@@ -75,7 +92,11 @@ export function createBookingAgentHandler(config: BookingAgentConfig) {
     const tools = createToolRunner(api, token, now);
     try {
       const turn = await provider.runTurn({ now, tools }, history, message);
-      const reply: AgentReply = { ...turn, booked: tools.booked };
+      const reply: AgentReply = {
+        reply: turn.reply,
+        history: { provider: provider.name, data: turn.history },
+        booked: tools.booked,
+      };
       return json(200, reply);
     } catch (err) {
       if (err instanceof HttpError) return json(err.status, { error: err.message });
@@ -85,10 +106,28 @@ export function createBookingAgentHandler(config: BookingAgentConfig) {
   };
 }
 
+type Env = Record<string, string | undefined>;
+
+/** The provider chosen in config, or null when its API key is missing. */
+export function providerFromEnv(name: AssistantProvider, env: Env): AgentProvider | null {
+  switch (name) {
+    case 'claude':
+      return env.ANTHROPIC_API_KEY ? createClaudeProvider(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })) : null;
+    case 'openai':
+      return env.OPENAI_API_KEY
+        ? createOpenAIProvider(new OpenAI({ apiKey: env.OPENAI_API_KEY }), env.OPENAI_MODEL || undefined)
+        : null;
+    case 'gemini':
+      return env.GEMINI_API_KEY
+        ? createGeminiProvider(new GoogleGenAI({ apiKey: env.GEMINI_API_KEY }), env.GEMINI_MODEL || undefined)
+        : null;
+  }
+}
+
 /** Builds the handler from environment variables (process.env on Vercel, loadEnv in Vite). */
-export function bookingAgentHandlerFromEnv(env: Record<string, string | undefined>) {
+export function bookingAgentHandlerFromEnv(env: Env) {
   return createBookingAgentHandler({
     dataApiUrl: env.VITE_NEON_DATA_API_URL ?? '',
-    provider: env.ANTHROPIC_API_KEY ? createClaudeProvider(env.ANTHROPIC_API_KEY) : null,
+    provider: providerFromEnv(BOOKING_ASSISTANT_PROVIDER, env),
   });
 }

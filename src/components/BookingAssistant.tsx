@@ -19,7 +19,8 @@ const GREETING: Line = {
 
 export function BookingAssistant({ onBooked }: Props) {
   const [lines, setLines] = useState<Line[]>([GREETING]);
-  const [history, setHistory] = useState<unknown[]>([]);
+  // null starts a new conversation; afterwards whatever the server sent back.
+  const [history, setHistory] = useState<unknown>(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
