@@ -7,7 +7,7 @@ import { CourtGrid } from './components/CourtGrid';
 import { DatePicker } from './components/DatePicker';
 import { MyBookings } from './components/MyBookings';
 import { UserBar } from './components/UserBar';
-import { CLUB_NAME } from './config';
+import { BOOKING_ASSISTANT_ENABLED, CLUB_NAME } from './config';
 import { toDateKey } from './dateUtils';
 import { useBookings } from './hooks/useBookings';
 import { neonConfigured } from './lib/neon';
@@ -125,7 +125,7 @@ function Schedule({ user }: { user: User }) {
         </section>
 
         <div className="sidebar">
-          <BookingAssistant onBooked={() => void refresh()} />
+          {BOOKING_ASSISTANT_ENABLED && <BookingAssistant onBooked={() => void refresh()} />}
           <MyBookings bookings={myBookings} now={now} onCancel={askCancel} onGoTo={setDate} />
         </div>
       </main>

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
+  BOOKING_ASSISTANT_ENABLED,
   BOOKING_WINDOW_DAYS,
   CLOSE_HOUR,
   CLUB_NAME,
@@ -344,6 +345,7 @@ export function createBookingAgentHandler(config: BookingAgentConfig) {
   const client = new Anthropic({ apiKey: config.anthropicApiKey });
 
   return async function handle(request: Request): Promise<Response> {
+    if (!BOOKING_ASSISTANT_ENABLED) return json(403, { error: 'The booking assistant is turned off.' });
     if (request.method !== 'POST') return json(405, { error: 'Method not allowed.' });
     if (!config.anthropicApiKey || !config.dataApiUrl) {
       return json(500, { error: "The booking assistant isn't configured." });

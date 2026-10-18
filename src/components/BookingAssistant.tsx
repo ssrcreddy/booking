@@ -54,12 +54,12 @@ export function BookingAssistant({ onBooked }: Props) {
       <h2>Booking assistant</h2>
       <ol className="assistant-log" ref={logRef} aria-live="polite">
         {lines.map((line, i) => (
-          <li key={i} className={line.from}>
+          <li key={i} className={`from-${line.from}`}>
             <span className="sr-only">{line.from === 'you' ? 'You: ' : 'Assistant: '}</span>
             {line.text}
           </li>
         ))}
-        {busy && <li className="assistant pending">Checking courts…</li>}
+        {busy && <li className="from-assistant pending">Checking courts…</li>}
       </ol>
       {error && <p className="form-error" role="alert">{error}</p>}
       <form className="assistant-form" onSubmit={send}>
