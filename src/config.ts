@@ -18,4 +18,10 @@ export const BOOKING_WINDOW_DAYS = 14;
 
 export const MAX_BOOKINGS_PER_USER_PER_DAY = 2;
 
+/**
+ * Admin switch for the Claude booking assistant. false hides the chat panel
+ * and makes /api/booking-agent refuse requests. Restart or redeploy to apply.
+ */
+export const BOOKING_ASSISTANT_ENABLED = true;
+
 export const HOURS = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);

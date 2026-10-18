@@ -33,6 +33,9 @@ Trigger exceptions come back as PostgREST code `P0001`. `neonBookingService.ts` 
 
 `src/config.ts` mirrors the DB rules (courts, hours, window, per-day cap) for rendering only. **Changing a rule means changing both the SQL and `config.ts`.** Schema changes go in a new numbered file in `db/migrations/`, which the user runs in the Neon SQL editor and follows with "Refresh schema" on the Data API page. Nothing applies migrations automatically.
 
+### Booking assistant (the one server-side piece)
+`server/bookingAgent.ts` is a chat agent (Claude via `@anthropic-ai/sdk`, manual tool-use loop with `get_availability` / `book_court`). It needs `ANTHROPIC_API_KEY` in `.env.local` (no `VITE_` prefix, so it never reaches the browser). The browser (`src/components/BookingAssistant.tsx`) POSTs `{history, message}` to `/api/booking-agent` with the player's Neon Auth JWT, and the agent calls the Data API **with that JWT**, so triggers and RLS still decide everything. The endpoint is served by a Vite plugin in `vite.config.ts` (`npm run dev` / `vite preview` only); `npm run build` output is static and does not include it. The handler is a web-standard `Request → Response`, so it can be mounted in any serverless runtime. The conversation state (`history`) round-trips through the browser. `BOOKING_ASSISTANT_ENABLED` in `src/config.ts` is the admin kill switch: `false` hides the panel and makes the endpoint return 403.
+
 ### Data flow
 - `App.tsx` wraps everything in `AuthProvider` (`src/auth/`). `Gate` picks one of three screens: not configured, `AuthScreen`, or `Schedule`.
 - The UI only uses the `BookingService` interface (`src/services/bookingService.ts`). The concrete instance is chosen in `src/services/index.ts` (currently `NeonBookingService`).

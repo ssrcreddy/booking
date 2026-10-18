@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { AuthScreen } from './components/AuthScreen';
+import { BookingAssistant } from './components/BookingAssistant';
 import { BookingDialog, type DialogRequest } from './components/BookingDialog';
 import { CourtGrid } from './components/CourtGrid';
 import { DatePicker } from './components/DatePicker';
 import { MyBookings } from './components/MyBookings';
 import { UserBar } from './components/UserBar';
-import { CLUB_NAME } from './config';
+import { BOOKING_ASSISTANT_ENABLED, CLUB_NAME } from './config';
 import { toDateKey } from './dateUtils';
 import { useBookings } from './hooks/useBookings';
 import { neonConfigured } from './lib/neon';
@@ -123,7 +124,10 @@ function Schedule({ user }: { user: User }) {
           />
         </section>
 
-        <MyBookings bookings={myBookings} now={now} onCancel={askCancel} onGoTo={setDate} />
+        <div className="sidebar">
+          {BOOKING_ASSISTANT_ENABLED && <BookingAssistant onBooked={() => void refresh()} />}
+          <MyBookings bookings={myBookings} now={now} onCancel={askCancel} onGoTo={setDate} />
+        </div>
       </main>
 
       {dialog && <BookingDialog request={dialog} onConfirm={confirm} onClose={closeDialog} />}
