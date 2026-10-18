@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { AuthScreen } from './components/AuthScreen';
+import { BookingAssistant } from './components/BookingAssistant';
 import { BookingDialog, type DialogRequest } from './components/BookingDialog';
 import { CourtGrid } from './components/CourtGrid';
 import { DatePicker } from './components/DatePicker';
@@ -123,7 +124,10 @@ function Schedule({ user }: { user: User }) {
           />
         </section>
 
-        <MyBookings bookings={myBookings} now={now} onCancel={askCancel} onGoTo={setDate} />
+        <div className="sidebar">
+          <BookingAssistant onBooked={() => void refresh()} />
+          <MyBookings bookings={myBookings} now={now} onCancel={askCancel} onGoTo={setDate} />
+        </div>
       </main>
 
       {dialog && <BookingDialog request={dialog} onConfirm={confirm} onClose={closeDialog} />}
